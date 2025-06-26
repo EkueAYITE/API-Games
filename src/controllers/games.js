@@ -1,8 +1,6 @@
-
-import Games from '../shema/Games.js';
 import jwt from 'jsonwebtoken';
 import mongoose from "mongoose";
-
+import Games, { Tracking } from '../shema/Games.js';
 
 export const getAllGames = async (req, res) => {
     try {
@@ -33,76 +31,121 @@ export const MultiplayerGames = async (req, res) => {
         res.status(500).json({ error: 'Erreur serveur' });
     }
 }
-export const SingleGame = async (req, res) =>{
+export const SingleGame = async (req, res) => {
     try {
         const gameId = req.params.id;
-        console.log("GameId reçu:", gameId); // Debug
+        const userId = req.user?.id; // Nécessite que verifyToken soit utilisé en middleware
 
-        // Récupérer les informations du jeu
+        if (!mongoose.Types.ObjectId.isValid(gameId)) {
+            return res.status(400).json({ error: "ID invalide" });
+        }
+
         const game = await Games.findById(gameId);
 
         if (!game) {
-            return res.status(404).json({ message: "Jeu non trouvé" });
+            return res.status(404).json({ error: "Jeu non trouvé" });
         }
 
-        console.log("Jeu trouvé:", game.title); // Debug
+        // Par défaut, on renvoie juste le jeu
+        let response = { game };
 
-        // Pour l'instant, on ignore le tracking et on retourne juste le jeu
-        const response = {
-            id: game.id,
-            title: game.title,
-            isSinglePlayer: game.isSinglePlayer,
-            isMultiplayer: game.isMultiplayer,
-            // Valeurs par défaut sans tracking pour l'instant
-            hasPlayed: false,
-            difficulty: null,
-            gameProgress: null,
-            gameLevel: 1,
-            completionPercentage: 0
-        };
+        // Si l'utilisateur est connecté, on vérifie s'il a un tracking pour ce jeu
+        if (userId) {
+            const tracking = await Tracking.findOne({ gameId, userId });
+
+            if (tracking) {
+                response = {
+                    game,
+                    tracking
+                };
+            }
+        }
 
         res.status(200).json(response);
     } catch (error) {
-        console.error("Erreur complète:", error); // Debug détaillé
-        res.status(500).json({
-            message: "Erreur lors de la récupération du jeu",
-            error: error.message
-        });
+        console.error("Erreur:", error);
+        res.status(500).json({ error: "Erreur serveur" });
     }
 };
+
 export const SingleGameUpdate = async (req, res) => {
     try {
-        const gameId = req.params.id;
-        const userId = req.user.id; // Depuis le token JWT
-        const trackingData = req.body;
+        console.log('Headers:', req.headers);
+        console.log('Body:', req.body);
+        console.log('Params:', req.params);
+        console.log('User:', req.user);
 
-        // Vérifier que le jeu existe
-        const game = await Game.findById(gameId);
-        if (!game) {
+        const gameId = req.params.id;
+        const userId = req.user?.userId;
+
+        if (!userId) {
+            return res.status(401).json({ message: "Utilisateur non authentifié" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(gameId)) {
+            return res.status(400).json({ message: "ID de jeu invalide" });
+        }
+
+        const gameExists = await Games.exists({ _id: gameId });
+        if (!gameExists) {
             return res.status(404).json({ message: "Jeu non trouvé" });
         }
 
-        // Mettre à jour ou créer le suivi
+        const updateData = {
+            ...req.body,
+            updatedAt: new Date()
+        };
+
         const tracking = await Tracking.findOneAndUpdate(
-            { gameId: gameId, userId: userId },
-            {
-                ...trackingData,
-                updatedAt: new Date()
-            },
+            { gameId, userId },
+            updateData,
             {
                 new: true,
-                upsert: true // Crée si n'existe pas
+                upsert: true,
+                runValidators: true
             }
-        );
+        ).catch(err => {
+            console.error('Erreur Mongoose:', err.message, err);
+            throw err;
+        });
 
-        res.status(200).json({
-            message: "Suivi mis à jour avec succès",
+        return res.status(200).json({
+            success: true,
             data: tracking
         });
+
     } catch (error) {
+        console.error('Erreur complète:', error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Erreur serveur",
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+};
+
+// controllers/trackingController.js
+export const getUserTrackedGames = async (req, res) => {
+    try {
+        console.log('User ID from token:', req.user.id); // Debug
+
+        // Utilisez soit req.user.id soit req.user.userId selon ce que vous stockez dans le token
+        const userId = req.user.id || req.user.userId;
+
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ message: "ID utilisateur invalide" });
+        }
+
+        const trackedGames = await Tracking.find({ userId })
+            .populate('gameId')
+            .lean();
+
+        res.status(200).json(trackedGames || []);
+    } catch (error) {
+        console.error('Erreur:', error);
         res.status(500).json({
-            message: "Erreur lors de la mise à jour du suivi",
-            error: error.message
+            message: 'Erreur serveur',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };

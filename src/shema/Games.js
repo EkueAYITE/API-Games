@@ -1,23 +1,38 @@
 import mongoose from 'mongoose';
 
 const gameSchema = new mongoose.Schema({
-    title: { type: String, required: true },
-    isSinglePlayer: { type: Boolean, default: false },
-    isMultiplayer: { type: Boolean, default: false },
-    // autres champs...
-});
-
-// Modèle Tracking
-const trackingSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    gameId: { type: mongoose.Schema.Types.ObjectId, ref: 'Game', required: true },
-    hasPlayed: { type: Boolean, default: false },
+    internalName: String,
+    title: String,
+    steamAppID: String,
+    isSinglePlayer: Boolean,
+    isMultiplayer: Boolean,
+    thumb: String,
+    gameID: String,
+    metacriticScore: String,
+    steamRatingText: String,
+    steamRatingPercent: String,
+    normalPrice: String,
+    salePrice: String,
+    dealRating: String,
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: null },
     gameProgress: { type: String, enum: ['in-progress', 'completed'], default: null },
     gameLevel: { type: Number, min: 1, max: 10, default: 1 },
-    completionPercentage: { type: Number, min: 0, max: 10, default: 0 },
-    updatedAt: { type: Date, default: Date.now }
+    completionPercentage: { type: Number, min: 0, max: 10, default: 0 }
 });
 
-// Index unique pour éviter les doublons
-trackingSchema.index({ userId: 1, gameId: 1 }, { unique: true });
+const trackingSchema = new mongoose.Schema({
+    gameId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Games' },
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    hasPlayed: { type: Boolean, default: false },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'] },
+    gameProgress: { type: String, enum: ['in-progress', 'completed'] },
+    gameLevel: { type: Number, min: 1, max: 10 },
+    completionPercentage: { type: Number, min: 0, max: 100 },
+    updatedAt: { type: Date }
+}, { timestamps: true });
+
+const Games = mongoose.model('Games', gameSchema);
+const Tracking = mongoose.model('Tracking', trackingSchema);
+
+export default Games;
+export { Tracking };

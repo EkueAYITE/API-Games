@@ -3,15 +3,20 @@ import cors from 'cors';
 import 'dotenv/config';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import verifyToken from "./middlewares/verifiytoken.js";
 import fs from 'fs';
 import mongoose from 'mongoose';
 import {getAllUsers, login, logout, register} from "./controllers/auth.js";
 import dotenv from 'dotenv';
 import jwt from "jsonwebtoken";
 import User from "./shema/user.js";
-import {MultiplayerGames, SingleGame, SingleGameUpdate, SinglePlayerGames} from "./controllers/games.js";
-
-
+import {
+    getUserTrackedGames,
+    MultiplayerGames,
+    SingleGame,
+    SingleGameUpdate,
+    SinglePlayerGames,
+} from "./controllers/games.js";
 
 dotenv.config();
 
@@ -19,6 +24,7 @@ dotenv.config();
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/GameHub_db')
     .then(() => console.log("✅ Connecté à MongoDB"))
     .catch(err => console.error("❌ Erreur de connexion MongoDB:", err));
+
 
 
 // Configuration des chemins
@@ -29,13 +35,15 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = 3000;
 
+
+// Middleware pour parser le JSON
+app.use(express.json());
 // Configuration de CO RS pour permettre l'accès
 app.use(cors({ origin : 'http://localhost:5173',
     methods : ['GET','POST','PUT','DELETE'],
     credentials: true}))
 
-// Middleware pour parser le JSON
-app.use(express.json());
+
 
 app.use((req, res, next) => {
     console.log(`⚡ Requête: ${req.method} ${req.originalUrl}`);
@@ -112,11 +120,13 @@ app.get('/api/games/search/:query', (req, res) => {
 });
 
 // Route pour obtenir un jeu par ID et remplir les données
-app.get('/api/games/player/:id',SingleGame);
+app.get('/api/games/player/:id', verifyToken,SingleGame);
 
-app.put('/api/games/update/:id', SingleGameUpdate);
+//Route pour mettre à jour un jeu par ID
+app.put('/api/games/update/:id',verifyToken ,SingleGameUpdate);
 
-//app.get('api/games/solo/:id',Single);
+// Route pour obtenir les jeux suivis par un utilisateur
+app.get('/api/games/tracking', verifyToken, getUserTrackedGames);
 
 // Route de base pour vérifier que le serveur fonctionne
 app.get('/', (req, res) => {
