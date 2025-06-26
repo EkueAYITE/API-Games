@@ -128,7 +128,8 @@ export const SingleGameUpdate = async (req, res) => {
 export const getUserTrackedGames = async (req, res) => {
     try {
         console.log('User ID from token:', req.user.id); // Debug
-
+        console.log('User ID from token (alternative):', req.user.userId); // Debug
+        
         // Utilisez soit req.user.id soit req.user.userId selon ce que vous stockez dans le token
         const userId = req.user.id || req.user.userId;
 

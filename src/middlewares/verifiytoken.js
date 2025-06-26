@@ -9,10 +9,15 @@ const verifyToken = (req, res, next) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Structurez req.user comme attendu par vos contrôleurs
+        const userId = decoded.id || decoded.userId;
+
+        if (!userId) {
+            return res.status(401).json({ message: "Token invalide : id utilisateur manquant" });
+        }
+
         req.user = {
-            id: decoded.id,  // Assurez-vous que le token contient bien un champ 'id'
-            userId: decoded.id // Double accès pour compatibilité
+            id: userId,
+            userId: userId
         };
 
         next();
